@@ -22,6 +22,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::vec::Vec;
 
 use digest::Digest;
+use rustler::{Decoder, Encoder, NifResult, Term};
 
 pub mod codec;
 pub mod ietf;
@@ -164,6 +165,23 @@ pub struct Secret<S: Suite> {
     pub scalar: ScalarField<S>,
     // Cached public point.
     pub public: Public<S>,
+}
+
+impl<S: Suite> Encoder for Secret<S> {
+    fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
+        let mut buf = Vec::new();
+        self.serialize_compressed(&mut buf).unwrap();
+        buf.encode(env)
+    }
+}
+
+impl<'a, S: Suite + 'a> Decoder<'a> for Secret<S> {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let binary: Vec<u8> = term.decode()?;
+        let secret = Secret::<S>::deserialize_compressed(&binary[..])
+            .map_err(|_| rustler::Error::Atom("deserialization_failed"))?;
+        Ok(secret)
+    }
 }
 
 impl<S: Suite> Drop for Secret<S> {
