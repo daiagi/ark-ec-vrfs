@@ -22,7 +22,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::vec::Vec;
 
 use digest::Digest;
-use rustler::{Decoder, Encoder, NifResult, Term};
+use rustler::{Decoder, Encoder, NifResult, NifStruct, Term};
 
 pub mod codec;
 pub mod ietf;
@@ -55,6 +55,46 @@ pub type CurveConfig<S> = <AffinePoint<S> as AffineRepr>::Config;
 pub type HashOutput<S> = digest::Output<<S as Suite>::Hasher>;
 
 pub use codec::Codec;
+#[derive(Debug, Clone, PartialEq)]
+
+pub struct ScalarFieldWrapper<S: Suite>(pub ScalarField<S>);
+#[derive(Debug, Clone, PartialEq)]
+
+pub struct PublicWrapper<S: Suite>(pub Public<S>);
+
+impl<S: Suite> Encoder for ScalarFieldWrapper<S> {
+    fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
+        let mut buf = Vec::new();
+        self.0.serialize_compressed(&mut buf).unwrap();
+        buf.encode(env)
+    }
+}
+
+impl<'a, S: Suite + 'a> Decoder<'a> for ScalarFieldWrapper<S> {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let binary: Vec<u8> = term.decode()?;
+        let scalar = ScalarField::<S>::deserialize_compressed(&binary[..])
+            .map_err(|_| rustler::Error::Atom("deserialization_failed"))?;
+        Ok(ScalarFieldWrapper(scalar))
+    }
+}
+
+impl<S: Suite> Encoder for PublicWrapper<S> {
+    fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
+        let mut buf = Vec::new();
+        self.0.serialize_compressed(&mut buf).unwrap();
+        buf.encode(env)
+    }
+}
+
+impl<'a, S: Suite + 'a> Decoder<'a> for PublicWrapper<S> {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let binary: Vec<u8> = term.decode()?;
+        let public = Public::<S>::deserialize_compressed(&binary[..])
+            .map_err(|_| rustler::Error::Atom("deserialization_failed"))?;
+        Ok(PublicWrapper(public))
+    }
+}
 
 #[derive(Debug)]
 pub enum Error {
@@ -158,6 +198,33 @@ pub trait Suite: Copy {
     }
 }
 
+// Define the SecretWrapper
+#[derive(Debug, Clone, PartialEq, NifStruct)]
+#[module = "BandersnatchRingVrf.Secret"]
+pub struct SecretWrapper<S: Suite> {
+    pub scalar: ScalarFieldWrapper<S>,
+    // Cached public point.
+    pub public: PublicWrapper<S>,
+}
+
+impl<S: Suite> From<Secret<S>> for SecretWrapper<S> {
+    fn from(secret: Secret<S>) -> Self {
+        SecretWrapper {
+            scalar: ScalarFieldWrapper(secret.scalar),
+            public: PublicWrapper(secret.public),
+        }
+    }
+}
+
+impl<S: Suite> From<SecretWrapper<S>> for Secret<S> {
+    fn from(wrapper: SecretWrapper<S>) -> Self {
+        Secret {
+            scalar: wrapper.scalar.0,
+            public: wrapper.public.0,
+        }
+    }
+}
+
 /// Secret key.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Secret<S: Suite> {
@@ -167,22 +234,22 @@ pub struct Secret<S: Suite> {
     pub public: Public<S>,
 }
 
-impl<S: Suite> Encoder for Secret<S> {
-    fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
-        let mut buf = Vec::new();
-        self.serialize_compressed(&mut buf).unwrap();
-        buf.encode(env)
-    }
-}
+// impl<S: Suite> Encoder for Secret<S> {
+//     fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
+//         let mut buf = Vec::new();
+//         self.serialize_compressed(&mut buf).unwrap();
+//         buf.encode(env)
+//     }
+// }
 
-impl<'a, S: Suite + 'a> Decoder<'a> for Secret<S> {
-    fn decode(term: Term<'a>) -> NifResult<Self> {
-        let binary: Vec<u8> = term.decode()?;
-        let secret = Secret::<S>::deserialize_compressed(&binary[..])
-            .map_err(|_| rustler::Error::Atom("deserialization_failed"))?;
-        Ok(secret)
-    }
-}
+// impl<'a, S: Suite + 'a> Decoder<'a> for Secret<S> {
+//     fn decode(term: Term<'a>) -> NifResult<Self> {
+//         let binary: Vec<u8> = term.decode()?;
+//         let secret = Secret::<S>::deserialize_compressed(&binary[..])
+//             .map_err(|_| rustler::Error::Atom("deserialization_failed"))?;
+//         Ok(secret)
+//     }
+// }
 
 impl<S: Suite> Drop for Secret<S> {
     fn drop(&mut self) {
