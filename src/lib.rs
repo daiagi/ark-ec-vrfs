@@ -168,27 +168,33 @@ pub struct Secret<S: Suite> {
 }
 impl<S: Suite> Encoder for Secret<S> {
     fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
-        let scalar_buf = {
-            let mut buf = Vec::new();
-            S::Codec::scalar_encode(&self.scalar, &mut buf);
-            buf.encode(env)
-        };
-        let public_buf = self.public.encode(env);
+        let mut scalar_buf: Vec<u8> = Vec::new();
+        let mut public_buf: Vec<u8> = Vec::new();
 
-        [("scalar", scalar_buf), ("public", public_buf)].encode(env)
+        // Encode the scalar field
+        S::Codec::scalar_encode(&self.scalar, &mut scalar_buf);
+        eprintln!("scalar_buf: {:?}", scalar_buf);
+
+        // Encode the public key as a Term
+        let public_term = self.public.encode(env);
+
+        // Combine both encoded parts into a tuple
+        (scalar_buf, public_term).encode(env)
     }
 }
 
 impl<'a, S: Suite + 'a> Decoder<'a> for Secret<S> {
     fn decode(term: Term<'a>) -> NifResult<Self> {
-        let scalar_term: Term = term.map_get("scalar")?;
-        let public_term: Term = term.map_get("public")?;
+        // Decode the tuple containing the scalar and public parts
+        let (scalar_buf, public_term): (Vec<u8>, Term<'a>) = term.decode()?;
 
-        let scalar_bytes: Vec<u8> = scalar_term.decode()?;
-        let public: Public<S> = public_term.decode()?;
+        // Decode the scalar from the scalar buffer
+        let scalar = S::Codec::scalar_decode(&scalar_buf);
 
-        let scalar = S::Codec::scalar_decode(&scalar_bytes);
+        // Decode the public key using the existing Decoder implementation for Public<S>
+        let public = public_term.decode()?;
 
+        // Construct and return the Secret<S> instance
         Ok(Secret { scalar, public })
     }
 }
