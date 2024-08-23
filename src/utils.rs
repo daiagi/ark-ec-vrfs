@@ -16,8 +16,6 @@ macro_rules! suite_types {
         #[allow(dead_code)]
         pub type Secret = $crate::Secret<$suite>;
         #[allow(dead_code)]
-        pub type SecretWrapper = $crate::SecretWrapper<$suite>;
-        #[allow(dead_code)]
         pub type Public = $crate::Public<$suite>;
         #[allow(dead_code)]
         pub type Input = $crate::Input<$suite>;
