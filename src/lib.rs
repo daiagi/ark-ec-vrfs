@@ -168,14 +168,12 @@ pub struct Secret<S: Suite> {
 }
 impl<S: Suite> Encoder for Secret<S> {
     fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
-        let mut scalar_buf: Vec<u8> = Vec::new();
-        let mut public_buf: Vec<u8> = Vec::new();
-
-        // Encode the scalar field
-        S::Codec::scalar_encode(&self.scalar, &mut scalar_buf);
-
-        // Encode the public key as a Term
-        let public_term = self.public.encode(env);
+        let scalar_buf = {
+            let mut buf = Vec::new();
+            S::Codec::scalar_encode(&self.scalar, &mut buf);
+            buf.encode(env)
+        };
+        let public_buf = self.public.encode(env);
 
         [("scalar", scalar_buf), ("public", public_buf)].encode(env)
     }
