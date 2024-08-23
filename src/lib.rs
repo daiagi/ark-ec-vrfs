@@ -278,7 +278,8 @@ pub struct Public<S: Suite>(pub AffinePoint<S>);
 impl<S: Suite> Encoder for Public<S> {
     fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
         let mut buf = Vec::new();
-        S::Codec::point_encode(&self.0, &mut buf).encode(env)
+        S::Codec::point_encode(&self.0, &mut buf);
+        buf.encode(env)
     }
 }
 
