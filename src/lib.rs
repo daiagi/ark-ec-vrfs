@@ -182,6 +182,22 @@ impl<S: Suite> Encoder for Secret<S> {
     }
 }
 
+impl<'a, S: Suite + 'a> Decoder<'a> for Secret<S> {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        // Decode the tuple containing the scalar and public parts
+        let (scalar_buf, public_term): (Vec<u8>, Term<'a>) = term.decode()?;
+
+        // Decode the scalar from the scalar buffer
+        let scalar = S::Codec::scalar_decode(&scalar_buf);
+
+        // Decode the public key using the existing Decoder implementation for Public<S>
+        let public = public_term.decode()?;
+
+        // Construct and return the Secret<S> instance
+        Ok(Secret { scalar, public })
+    }
+}
+
 impl<S: Suite> Drop for Secret<S> {
     fn drop(&mut self) {
         self.scalar.zeroize()
