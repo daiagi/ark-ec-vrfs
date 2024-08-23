@@ -173,7 +173,6 @@ impl<S: Suite> Encoder for Secret<S> {
 
         // Encode the scalar field
         S::Codec::scalar_encode(&self.scalar, &mut scalar_buf);
-        eprintln!("scalar_buf: {:?}", scalar_buf);
 
         // Encode the public key as a Term
         let public_term = self.public.encode(env);
