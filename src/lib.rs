@@ -166,21 +166,19 @@ pub struct Secret<S: Suite> {
     // Cached public point.
     pub public: Public<S>,
 }
-
 impl<S: Suite> Encoder for Secret<S> {
     fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
-        let mut buf = Vec::new();
-        self.serialize_compressed(&mut buf).unwrap();
-        buf.encode(env)
-    }
-}
+        let mut scalar_buf: Vec<u8> = Vec::new();
+        let mut public_buf: Vec<u8> = Vec::new();
 
-impl<'a, S: Suite + 'a> Decoder<'a> for Secret<S> {
-    fn decode(term: Term<'a>) -> NifResult<Self> {
-        let binary: Vec<u8> = term.decode()?;
-        let secret = Secret::<S>::deserialize_compressed(&binary[..])
-            .map_err(|_| rustler::Error::Atom("deserialization_failed"))?;
-        Ok(secret)
+        // Encode the scalar field
+        S::Codec::scalar_encode(&self.scalar, &mut scalar_buf);
+
+        // Encode the public key as a Term
+        let public_term = self.public.encode(env);
+
+        // Combine both encoded parts into a tuple
+        (scalar_buf, public_term).encode(env)
     }
 }
 
@@ -260,6 +258,22 @@ impl<S: Suite> Secret<S> {
 /// Public key generic over the cipher suite.
 #[derive(Debug, Copy, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Public<S: Suite>(pub AffinePoint<S>);
+
+impl<S: Suite> Encoder for Public<S> {
+    fn encode<'b>(&self, env: rustler::Env<'b>) -> Term<'b> {
+        let mut buf = Vec::new();
+        S::Codec::point_encode(&self.0, &mut buf).encode(env)
+    }
+}
+
+impl<'a, S: Suite + 'a> Decoder<'a> for Public<S> {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let binary: Vec<u8> = term.decode()?;
+        let point = S::Codec::point_decode(&binary[..])
+            .map_err(|_| rustler::Error::Atom("deserialization_failed"))?;
+        Ok(Public(point))
+    }
+}
 
 /// VRF input point generic over the cipher suite.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
