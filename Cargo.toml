@@ -18,7 +18,7 @@ rand_chacha = { version = "0.3", default-features = false }
 rayon = { version = "1.10", default-features = false, optional = true }
 hmac = { version = "0.12", default-features = false, optional = true }
 # Waiting for crates.io
-ring-proof = { package = "ring", git = "https://github.com/daiagi/ring-proof", branch = "extended", default-features = false, optional = true }
+ring-proof = { package = "ring", git = "https://github.com/jamixir/ring-proof", branch = "extended", default-features = false, optional = true }
 # Curves
 
 rustler = "0.34.0"
